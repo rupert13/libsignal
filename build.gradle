@@ -1,0 +1,12 @@
+subprojects {
+    ext.version_number     = "2.3.1"
+    ext.group_info         = "org.whispersystems"
+
+    if (JavaVersion.current().isJava8Compatible()) {
+        allprojects {
+            tasks.withType(Javadoc) {
+                options.addStringOption('Xdoclint:none', '-quiet')
+            }
+        }
+    }
+}
