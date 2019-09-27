@@ -18,17 +18,17 @@ import org.whispersystems.signalservice.api.SignalServiceMessageReceiver;
  */
 public class SignalServiceAttachmentPointer extends SignalServiceAttachment {
 
-  private final long              id;
+  private final String id;
   private final byte[]            key;
   private final Optional<String>  relay;
   private final Optional<Integer> size;
   private final Optional<byte[]>  preview;
 
-  public SignalServiceAttachmentPointer(long id, String contentType, byte[] key, String relay) {
+  public SignalServiceAttachmentPointer(String id, String contentType, byte[] key, String relay) {
     this(id, contentType, key, relay, Optional.<Integer>absent(), Optional.<byte[]>absent());
   }
 
-  public SignalServiceAttachmentPointer(long id, String contentType, byte[] key, String relay,
+  public SignalServiceAttachmentPointer(String id, String contentType, byte[] key, String relay,
                                         Optional<Integer> size, Optional<byte[]> preview)
   {
     super(contentType);
@@ -39,7 +39,7 @@ public class SignalServiceAttachmentPointer extends SignalServiceAttachment {
     this.preview = preview;
   }
 
-  public long getId() {
+  public String getId() {
     return id;
   }
 

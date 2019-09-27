@@ -9,7 +9,7 @@ group               = group_info
 
 repositories {
     maven {
-        url 'https://jitpack.io'
+        url 'https://www.jitpack.io'
     }
     mavenCentral()
     mavenLocal()
@@ -39,9 +39,9 @@ signing {
 }
 
 
-def sonatypeRepo            = sonatypeRepo != null ? sonatypeRepo : ""
-def whisperSonatypeUsername = whisperSonatypeUsername != null ? whisperSonatypeUsername : ""
-def whisperSonatypePassword = whisperSonatypePassword != null ? whisperSonatypePassword : ""
+def sonatypeRepo            = ""
+def whisperSonatypeUsername = ""
+def whisperSonatypePassword = ""
 
 uploadArchives {
     configuration = configurations.archives

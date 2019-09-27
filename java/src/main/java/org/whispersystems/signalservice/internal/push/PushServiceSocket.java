@@ -13,7 +13,6 @@ import com.squareup.okhttp.OkHttpClient;
 import com.squareup.okhttp.Request;
 import com.squareup.okhttp.RequestBody;
 import com.squareup.okhttp.Response;
-
 import org.apache.http.conn.ssl.StrictHostnameVerifier;
 import org.whispersystems.libsignal.IdentityKey;
 import org.whispersystems.libsignal.ecc.ECPublicKey;
@@ -26,8 +25,8 @@ import org.whispersystems.signalservice.api.crypto.AttachmentCipherOutputStream;
 import org.whispersystems.signalservice.api.messages.SignalServiceAttachment.ProgressListener;
 import org.whispersystems.signalservice.api.messages.multidevice.DeviceInfo;
 import org.whispersystems.signalservice.api.push.ContactTokenDetails;
-import org.whispersystems.signalservice.api.push.SignedPreKeyEntity;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
+import org.whispersystems.signalservice.api.push.SignedPreKeyEntity;
 import org.whispersystems.signalservice.api.push.TrustStore;
 import org.whispersystems.signalservice.api.push.exceptions.AuthorizationFailedException;
 import org.whispersystems.signalservice.api.push.exceptions.ExpectationFailedException;
@@ -42,25 +41,25 @@ import org.whispersystems.signalservice.internal.push.exceptions.StaleDevicesExc
 import org.whispersystems.signalservice.internal.util.Base64;
 import org.whispersystems.signalservice.internal.util.BlacklistingTrustManager;
 import org.whispersystems.signalservice.internal.util.JsonUtil;
-import org.whispersystems.signalservice.internal.util.Util;
 
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
-import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
 
 /**
  * @author Moxie Marlinspike
@@ -352,35 +351,14 @@ public class PushServiceSocket {
     makeRequest(SIGNED_PREKEY_PATH, "PUT", JsonUtil.toJson(signedPreKeyEntity));
   }
 
-  public long sendAttachment(PushAttachmentData attachment) throws IOException {
-    String               response      = makeRequest(String.format(ATTACHMENT_PATH, ""), "GET", null);
-    AttachmentDescriptor attachmentKey = JsonUtil.fromJson(response, AttachmentDescriptor.class);
-
-    if (attachmentKey == null || attachmentKey.getLocation() == null) {
-      throw new IOException("Server failed to allocate an attachment key!");
-    }
-
-    Log.w(TAG, "Got attachment content location: " + attachmentKey.getLocation());
-
-    uploadAttachment("PUT", attachmentKey.getLocation(), attachment.getData(),
-                     attachment.getDataSize(), attachment.getKey(), attachment.getListener());
-
-    return attachmentKey.getId();
+  public String sendAttachment(PushAttachmentData attachment) throws IOException {
+    return uploadAttachment("POST", serviceUrl + String.format(ATTACHMENT_PATH, ""),
+            attachment.getData(), attachment.getDataSize(), attachment.getKey(), attachment.getListener());
   }
 
-  public void retrieveAttachment(String relay, long attachmentId, File destination, ProgressListener listener) throws IOException {
-    String path = String.format(ATTACHMENT_PATH, String.valueOf(attachmentId));
-
-    if (!Util.isEmpty(relay)) {
-      path = path + "?relay=" + relay;
-    }
-
-    String               response   = makeRequest(path, "GET", null);
-    AttachmentDescriptor descriptor = JsonUtil.fromJson(response, AttachmentDescriptor.class);
-
-    Log.w(TAG, "Attachment: " + attachmentId + " is at: " + descriptor.getLocation());
-
-    downloadExternalFile(descriptor.getLocation(), destination, listener);
+  public void retrieveAttachment(String relay, String attachmentId, File destination, ProgressListener listener) throws IOException {
+    String path = serviceUrl + String.format(ATTACHMENT_PATH, String.valueOf(attachmentId));
+    downloadExternalFile(path, destination, listener);
   }
 
   public List<ContactTokenDetails> retrieveDirectory(Set<String> contactTokens)
@@ -407,14 +385,14 @@ public class PushServiceSocket {
     }
   }
 
-  private void downloadExternalFile(String url, File localDestination, ProgressListener listener)
-      throws IOException
+  private void downloadExternalFile(String url, File localDestination, ProgressListener listener) throws IOException
   {
-    URL               downloadUrl = new URL(url);
-    HttpURLConnection connection  = (HttpURLConnection) downloadUrl.openConnection();
+    URL downloadUrl = new URL(url);
+    HttpsURLConnection connection  = (HttpsURLConnection) downloadUrl.openConnection();
     connection.setRequestProperty("Content-Type", "application/octet-stream");
     connection.setRequestMethod("GET");
     connection.setDoInput(true);
+    setRequestAuthorisation(connection);
 
     try {
       if (connection.getResponseCode() != 200) {
@@ -445,13 +423,14 @@ public class PushServiceSocket {
     }
   }
 
-  private void uploadAttachment(String method, String url, InputStream data,
+  private String uploadAttachment(String method, String url, InputStream data,
                                 long dataSize, byte[] key, ProgressListener listener)
-    throws IOException
+          throws IOException
   {
     URL                uploadUrl  = new URL(url);
     HttpsURLConnection connection = (HttpsURLConnection) uploadUrl.openConnection();
     connection.setDoOutput(true);
+    setRequestAuthorisation(connection);
 
     if (dataSize > 0) {
       connection.setFixedLengthStreamingMode((int) AttachmentCipherOutputStream.getCiphertextLength(dataSize));
@@ -486,8 +465,103 @@ public class PushServiceSocket {
       if (connection.getResponseCode() != 200) {
         throw new IOException("Bad response: " + connection.getResponseCode() + " " + connection.getResponseMessage());
       }
+      InputStream responseStream = new BufferedInputStream(connection.getInputStream());
+      BufferedReader responseStreamReader = new BufferedReader(new InputStreamReader(responseStream));
+      String line = "";
+      StringBuilder stringBuilder = new StringBuilder();
+      while ((line = responseStreamReader.readLine()) != null) {
+        stringBuilder.append(line);
+      }
+      responseStreamReader.close();
+      return stringBuilder.toString();
     } finally {
       connection.disconnect();
+    }
+  }
+
+//  private String uploadAttachment(String method, String url, InputStream data,
+//                                long dataSize, byte[] key, ProgressListener listener)
+//  {
+//    try {
+//      String crlf = "\r\n";
+//      String twoHyphens = "--";
+//      String boundary = "*****";
+//
+//      URL uploadUrl = new URL(url);
+//      HttpsURLConnection connection = (HttpsURLConnection) uploadUrl.openConnection();
+//      connection.setDoOutput(true);
+//      connection.setUseCaches(false);
+//      connection.setRequestMethod("POST");
+//      connection.setRequestProperty("Connection", "close");
+//      connection.setRequestProperty("Cache-Control", "no-cache");
+//      connection.setRequestProperty("Content-Type", "multipart/form-data;boundary=" + boundary);
+//
+//      setRequestAuthorisation(connection);
+//
+//      byte[] attachmentContentDisposition = ("Content-Disposition: form-data; name=\"attachment\"" + crlf).getBytes();
+//      byte[] octetStreamContentType = ("Content-Type: application/octet-stream" + crlf).getBytes();
+//      byte[] boundaryLine = (twoHyphens + boundary + crlf).getBytes();
+//      byte[] boundaryLastLine = (twoHyphens + boundary + twoHyphens).getBytes();
+//      byte[] crlfBytes = crlf.getBytes();
+//      long streamingLength = (int) AttachmentCipherOutputStream.getCiphertextLength(dataSize)
+//              + boundaryLine.length + boundaryLastLine.length + 2 * crlfBytes.length
+//              + attachmentContentDisposition.length + octetStreamContentType.length;
+////      if (dataSize > 0) {
+////        connection.setFixedLengthStreamingMode(streamingLength);
+////      } else {
+//        connection.setChunkedStreamingMode(0);
+////      }
+//
+//      DataOutputStream header = new DataOutputStream(connection.getOutputStream());
+//      AttachmentCipherOutputStream body = new AttachmentCipherOutputStream(key, connection.getOutputStream());
+//      header.write(boundaryLine);
+//      header.write(attachmentContentDisposition);
+//      header.write(octetStreamContentType);
+//      header.write(crlfBytes);
+//      int nRead, written = 0;
+//      byte[] buffer = new byte[4096];
+//      while ((nRead = data.read(buffer)) != -1) {
+//        body.write(buffer, 0, nRead);
+//        written += nRead;
+//        if (listener != null) {
+//          listener.onAttachmentProgress(dataSize, written);
+//        }
+//      }
+//      header.write(crlfBytes);
+//      header.write(boundaryLastLine);
+//      header.close();
+//      body.close();
+//
+//      InputStream responseStream = new BufferedInputStream(connection.getInputStream());
+//      BufferedReader responseStreamReader = new BufferedReader(new InputStreamReader(responseStream));
+//      String line = "";
+//      StringBuilder stringBuilder = new StringBuilder();
+//      while ((line = responseStreamReader.readLine()) != null) {
+//        stringBuilder.append(line);
+//      }
+//      responseStreamReader.close();
+//      String response = stringBuilder.toString();
+//      connection.disconnect();
+//      return response;
+//    } catch (Exception e) {
+//      return e.toString();
+//    }
+//  }
+
+  private void setRequestAuthorisation(HttpsURLConnection connection) {
+    try {
+      SSLContext context = SSLContext.getInstance("TLS");
+      context.init(null, trustManagers, null);
+      connection.setSSLSocketFactory(context.getSocketFactory());
+      connection.setHostnameVerifier(new StrictHostnameVerifier());
+      if (credentialsProvider.getPassword() != null) {
+        connection.setRequestProperty("Authorization", getAuthorizationHeader());
+      }
+      if (userAgent != null) {
+        connection.setRequestProperty("X-Signal-Agent", userAgent);
+      }
+    } catch (NoSuchAlgorithmException | KeyManagementException e) {
+      e.printStackTrace();
     }
   }
 

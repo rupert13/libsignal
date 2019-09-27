@@ -328,7 +328,7 @@ public class SignalServiceMessageSender {
   }
 
   private SendMessageResponse sendMessage(List<SignalServiceAddress> recipients, long timestamp, byte[] content, boolean legacy)
-      throws IOException, EncapsulatedExceptions
+      throws EncapsulatedExceptions
   {
     List<UntrustedIdentityException> untrustedIdentities = new LinkedList<>();
     List<UnregisteredUserException>  unregisteredUsers   = new LinkedList<>();
@@ -345,7 +345,7 @@ public class SignalServiceMessageSender {
       } catch (UnregisteredUserException e) {
         Log.w(TAG, e);
         unregisteredUsers.add(e);
-      } catch (PushNetworkException e) {
+      } catch (IOException e) {
         Log.w(TAG, e);
         networkExceptions.add(new NetworkFailureException(recipient.getNumber(), e));
       }
@@ -424,7 +424,7 @@ public class SignalServiceMessageSender {
                                                                attachment.getListener(),
                                                                attachmentKey);
 
-    long attachmentId = socket.sendAttachment(attachmentData);
+    String attachmentId = socket.sendAttachment(attachmentData);
 
     AttachmentPointer.Builder builder = AttachmentPointer.newBuilder()
                                                          .setContentType(attachment.getContentType())
