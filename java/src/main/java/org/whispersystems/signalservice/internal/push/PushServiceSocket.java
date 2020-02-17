@@ -137,17 +137,17 @@ public class PushServiceSocket {
   }
 
   public String getAccountVerificationToken() throws IOException {
-    String responseText = makeRequest(REQUEST_TOKEN_PATH, "GET", null);
+    String responseText = makeRequest(REQUEST_TOKEN_PATH, "GET", null).body().string();
     return JsonUtil.fromJson(responseText, AuthorizationToken.class).getToken();
   }
 
   public String getNewDeviceVerificationCode() throws IOException {
-    String responseText = makeRequest(PROVISIONING_CODE_PATH, "GET", null);
+    String responseText = makeRequest(PROVISIONING_CODE_PATH, "GET", null).body().string();
     return JsonUtil.fromJson(responseText, DeviceCode.class).getVerificationCode();
   }
 
   public List<DeviceInfo> getDevices() throws IOException {
-    String responseText = makeRequest(String.format(DEVICE_PATH, ""), "GET", null);
+    String responseText = makeRequest(String.format(DEVICE_PATH, ""), "GET", null).body().string();
     return JsonUtil.fromJson(responseText, DeviceInfoList.class).getDevices();
   }
 
@@ -183,10 +183,10 @@ public class PushServiceSocket {
       throws IOException
   {
     try {
-      String responseText = makeRequest(String.format(MESSAGE_PATH, bundle.getDestination()), "PUT", JsonUtil.toJson(bundle));
-
-      if (responseText == null) return new SendMessageResponse(false);
-      else                      return JsonUtil.fromJson(responseText, SendMessageResponse.class);
+      Response response = makeRequest(String.format(MESSAGE_PATH, bundle.getDestination()), "PUT", JsonUtil.toJson(bundle));
+      String responseText = response.body().string();
+      boolean needSync = responseText == null ? false : JsonUtil.fromJson(responseText, SendMessageResponse.class).getNeedsSync();;
+      return new SendMessageResponse(needSync, response.code());
     } catch (NotFoundException nfe) {
       throw new UnregisteredUserException(bundle.getDestination(), nfe);
     }
@@ -196,17 +196,17 @@ public class PushServiceSocket {
       throws IOException
   {
     try {
-      String responseText = makeRequest(String.format(MESSAGE_PATH_DEVICE, address, deviceId), "PUT", JsonUtil.toJson(bundle));
-
-      if (responseText == null) return new SendMessageResponse(false);
-      else                      return JsonUtil.fromJson(responseText, SendMessageResponse.class);
+      Response response = makeRequest(String.format(MESSAGE_PATH_DEVICE, address, deviceId), "PUT", JsonUtil.toJson(bundle));
+      String responseText = response.body().string();
+      boolean needSync = responseText == null ? false : JsonUtil.fromJson(responseText, SendMessageResponse.class).getNeedsSync();;
+      return new SendMessageResponse(needSync, response.code());
     } catch (NotFoundException nfe) {
       throw new UnregisteredUserException(address, nfe);
     }
   }
 
   public List<SignalServiceEnvelopeEntity> getMessages() throws IOException {
-    String responseText = makeRequest(String.format(MESSAGE_PATH, ""), "GET", null);
+    String responseText = makeRequest(String.format(MESSAGE_PATH, ""), "GET", null).body().string();
     return JsonUtil.fromJson(responseText, SignalServiceEnvelopeEntityList.class).getMessages();
   }
 
@@ -242,7 +242,7 @@ public class PushServiceSocket {
   }
 
   public int getAvailablePreKeys() throws IOException {
-    String       responseText = makeRequest(PREKEY_METADATA_PATH, "GET", null);
+    String       responseText = makeRequest(PREKEY_METADATA_PATH, "GET", null).body().string();
     PreKeyStatus preKeyStatus = JsonUtil.fromJson(responseText, PreKeyStatus.class);
 
     return preKeyStatus.getCount();
@@ -261,7 +261,7 @@ public class PushServiceSocket {
         path = path + "?relay=" + destination.getRelay().get();
       }
 
-      String             responseText = makeRequest(path, "GET", null);
+      String             responseText = makeRequest(path, "GET", null).body().string();
       PreKeyResponse     response     = JsonUtil.fromJson(responseText, PreKeyResponse.class);
       List<PreKeyBundle> bundles      = new LinkedList<>();
 
@@ -303,7 +303,7 @@ public class PushServiceSocket {
         path = path + "?relay=" + destination.getRelay().get();
       }
 
-      String         responseText = makeRequest(path, "GET", null);
+      String         responseText = makeRequest(path, "GET", null).body().string();
       PreKeyResponse response     = JsonUtil.fromJson(responseText, PreKeyResponse.class);
 
       if (response.getDevices() == null || response.getDevices().size() < 1)
@@ -336,7 +336,7 @@ public class PushServiceSocket {
 
   public SignedPreKeyEntity getCurrentSignedPreKey() throws IOException {
     try {
-      String responseText = makeRequest(SIGNED_PREKEY_PATH, "GET", null);
+      String responseText = makeRequest(SIGNED_PREKEY_PATH, "GET", null).body().string();
       return JsonUtil.fromJson(responseText, SignedPreKeyEntity.class);
     } catch (NotFoundException e) {
       Log.w(TAG, e);
@@ -366,7 +366,7 @@ public class PushServiceSocket {
   {
     try {
       ContactTokenList        contactTokenList = new ContactTokenList(new LinkedList<>(contactTokens));
-      String                  response         = makeRequest(DIRECTORY_TOKENS_PATH, "PUT", JsonUtil.toJson(contactTokenList));
+      String                  response         = makeRequest(DIRECTORY_TOKENS_PATH, "PUT", JsonUtil.toJson(contactTokenList)).body().string();
       ContactTokenDetailsList activeTokens     = JsonUtil.fromJson(response, ContactTokenDetailsList.class);
 
       return activeTokens.getContacts();
@@ -378,7 +378,7 @@ public class PushServiceSocket {
 
   public ContactTokenDetails getContactTokenDetails(String contactToken) throws IOException {
     try {
-      String response = makeRequest(String.format(DIRECTORY_VERIFY_PATH, contactToken), "GET", null);
+      String response = makeRequest(String.format(DIRECTORY_VERIFY_PATH, contactToken), "GET", null).body().string();
       return JsonUtil.fromJson(response, ContactTokenDetails.class);
     } catch (NotFoundException nfe) {
       return null;
@@ -565,7 +565,7 @@ public class PushServiceSocket {
     }
   }
 
-  private String makeRequest(String urlFragment, String method, String body)
+  private Response makeRequest(String urlFragment, String method, String body)
       throws NonSuccessfulResponseCodeException, PushNetworkException
   {
     Response response = getConnection(urlFragment, method, body);
@@ -636,7 +636,7 @@ public class PushServiceSocket {
                                                      responseMessage);
     }
 
-    return responseBody;
+    return response;
   }
 
   private Response getConnection(String urlFragment, String method, String body)
