@@ -104,7 +104,7 @@ public class OkHttpClientWrapper extends WebSocketListener {
               .build();
     OkHttpClient okHttpClient = new OkHttpClient.Builder()
             .certificatePinner(certPinner)
-            .socketFactory(createTlsSocketFactory(trustStore))
+            .sslSocketFactory(createTlsSocketFactory(trustStore))
             .readTimeout(timeout, unit)
             .connectTimeout(timeout, unit)
             .build();
