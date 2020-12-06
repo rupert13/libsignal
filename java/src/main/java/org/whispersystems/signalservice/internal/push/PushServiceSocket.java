@@ -657,11 +657,16 @@ public class PushServiceSocket {
                 .add("*.kalimdor.network",
                         "sha256/VtOB0C/9LihdefUvKEOHAB7f+IZgTvW+wfN9AzZ4tVg=")
                 .build();
-      OkHttpClient okHttpClient = new OkHttpClient.Builder()
+
+      OkHttpClient.Builder okHttpClientBuilder = new OkHttpClient.Builder()
               .certificatePinner(certPinner)
-              .sslSocketFactory(context.getSocketFactory(), (BlacklistingTrustManager)trustManagers[0])
-              .hostnameVerifier(new DefaultHostnameVerifier())
-              .build();
+              .hostnameVerifier(new DefaultHostnameVerifier());
+
+      if(trustManagers != null) {
+          okHttpClientBuilder.sslSocketFactory(context.getSocketFactory(), (BlacklistingTrustManager)trustManagers[0]);
+      }
+
+      OkHttpClient okHttpClient = okHttpClientBuilder.build();
 
       Request.Builder request = new Request.Builder();
       request.url(String.format("%s%s", serviceUrl, urlFragment));
