@@ -658,15 +658,11 @@ public class PushServiceSocket {
                         "sha256/VtOB0C/9LihdefUvKEOHAB7f+IZgTvW+wfN9AzZ4tVg=")
                 .build();
 
-      OkHttpClient.Builder okHttpClientBuilder = new OkHttpClient.Builder()
+      OkHttpClient okHttpClient = new OkHttpClient.Builder()
               .certificatePinner(certPinner)
-              .hostnameVerifier(new DefaultHostnameVerifier());
-
-      if(trustManagers != null) {
-          okHttpClientBuilder.sslSocketFactory(context.getSocketFactory(), (BlacklistingTrustManager)trustManagers[0]);
-      }
-
-      OkHttpClient okHttpClient = okHttpClientBuilder.build();
+              .hostnameVerifier(new DefaultHostnameVerifier())
+              .sslSocketFactory(context.getSocketFactory())
+              .build();
 
       Request.Builder request = new Request.Builder();
       request.url(String.format("%s%s", serviceUrl, urlFragment));
