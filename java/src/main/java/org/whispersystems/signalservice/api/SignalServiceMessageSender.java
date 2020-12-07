@@ -111,7 +111,7 @@ public class SignalServiceMessageSender {
    * @throws UntrustedIdentityException
    * @throws IOException
    */
-  public SendMessageResponse sendMessage(SignalServiceAddress recipient, SignalServiceDataMessage message)
+  public void sendMessage(SignalServiceAddress recipient, SignalServiceDataMessage message)
       throws UntrustedIdentityException, IOException
   {
     byte[]              content   = createMessageContent(message);
@@ -130,7 +130,6 @@ public class SignalServiceMessageSender {
         eventListener.get().onSecurityEvent(recipient);
       }
     }
-    return response;
   }
 
   /**
@@ -141,20 +140,20 @@ public class SignalServiceMessageSender {
    * @throws IOException
    * @throws EncapsulatedExceptions
    */
-  public SendMessageResponse sendMessage(List<SignalServiceAddress> recipients, SignalServiceDataMessage message)
+  public void sendMessage(List<SignalServiceAddress> recipients, SignalServiceDataMessage message)
       throws IOException, EncapsulatedExceptions
   {
-    return sendMessage(recipients, message, true);
+    sendMessage(recipients, message, true);
   }
 
-  public SendMessageResponse sendMessage(List<SignalServiceAddress> recipients, SignalServiceDataMessage message, boolean sendSync)
+  public void sendMessage(List<SignalServiceAddress> recipients, SignalServiceDataMessage message, boolean sendSync)
       throws IOException, EncapsulatedExceptions
   {
     byte[] content = createMessageContent(message);
     long timestamp = message.getTimestamp();
     byte[] syncMessage = createMultiDeviceSentTranscriptContent(content, Optional.<SignalServiceAddress>absent(), timestamp);
     try {
-      return sendMessage(recipients, timestamp, content, true);
+      sendMessage(recipients, timestamp, content, true);
     } finally {
       if (sendSync) {
         try {
@@ -166,28 +165,28 @@ public class SignalServiceMessageSender {
     }
   }
 
-  public SendMessageResponse sendMessage(SignalServiceAddress recipient, int deviceId, SignalServiceDataMessage message) throws IOException, EncapsulatedExceptions {
+  public void sendMessage(SignalServiceAddress recipient, int deviceId, SignalServiceDataMessage message) throws IOException, EncapsulatedExceptions {
     byte[] content = createMessageContent(message);
     long timestamp = message.getTimestamp();
     try {
-      return sendMessage(recipient, deviceId, timestamp, content, true);
+      sendMessage(recipient, deviceId, timestamp, content, true);
     } catch (UntrustedIdentityException e) {
       throw new EncapsulatedExceptions(e);
     }
   }
 
-  public SendMessageResponse sendSyncMessage(SignalServiceDataMessage message) throws IOException, EncapsulatedExceptions {
+  public void sendSyncMessage(SignalServiceDataMessage message) throws IOException, EncapsulatedExceptions {
     byte[] content = createMessageContent(message);
     long timestamp = message.getTimestamp();
     byte[] syncMessage = createMultiDeviceSentTranscriptContent(content, Optional.<SignalServiceAddress>absent(), timestamp);
     try {
-      return sendMessage(localAddress, timestamp, syncMessage, false);
+      sendMessage(localAddress, timestamp, syncMessage, false);
     } catch (UntrustedIdentityException e) {
       throw new EncapsulatedExceptions(e);
     }
   }
 
-  public SendMessageResponse sendMessage(SignalServiceSyncMessage message)
+  public void sendMessage(SignalServiceSyncMessage message)
       throws IOException, UntrustedIdentityException
   {
     byte[] content;
@@ -204,7 +203,7 @@ public class SignalServiceMessageSender {
       throw new IOException("Unsupported sync message!");
     }
 
-    return sendMessage(localAddress, System.currentTimeMillis(), content, false);
+    sendMessage(localAddress, System.currentTimeMillis(), content, false);
   }
 
   private byte[] createMessageContent(SignalServiceDataMessage message) throws IOException {
