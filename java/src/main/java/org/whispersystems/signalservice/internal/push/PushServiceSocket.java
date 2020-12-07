@@ -660,7 +660,7 @@ public class PushServiceSocket {
 
       OkHttpClient okHttpClient = new OkHttpClient.Builder()
               .certificatePinner(certPinner)
-              .hostnameVerifier(new DefaultHostnameVerifier())
+              .hostnameVerifier(new StrictHostnameVerifier())
               .sslSocketFactory(context.getSocketFactory())
               .build();
 
