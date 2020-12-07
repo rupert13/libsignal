@@ -404,8 +404,9 @@ public class PushServiceSocket {
       SSLContext context;
       try {
           context = SSLContext.getInstance("TLS");
+          context.init(null, trustManagers, null);
           okHttpClientBuilder.sslSocketFactory(context.getSocketFactory());
-      } catch (NoSuchAlgorithmException e) {
+      } catch (NoSuchAlgorithmException | KeyManagementException e) {
           e.printStackTrace();
       }
       okHttpClient = okHttpClientBuilder.build();
@@ -469,8 +470,9 @@ public class PushServiceSocket {
       SSLContext context;
       try {
           context = SSLContext.getInstance("TLS");
+          context.init(null, trustManagers, null);
           okHttpClientBuilder.sslSocketFactory(context.getSocketFactory());
-      } catch (NoSuchAlgorithmException e) {
+      } catch (NoSuchAlgorithmException | KeyManagementException e) {
           e.printStackTrace();
       }
       okHttpClient = okHttpClientBuilder.build();
