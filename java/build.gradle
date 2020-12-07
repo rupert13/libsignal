@@ -16,15 +16,15 @@ repositories {
 }
 
 dependencies {
-    compile 'com.google.protobuf:protobuf-java:2.5.0'
-    compile 'com.googlecode.libphonenumber:libphonenumber:7.1.0'
-    compile 'com.fasterxml.jackson.core:jackson-databind:2.5.0'
-    compile 'org.apache.httpcomponents:httpclient:4.4'
-    compile 'com.squareup.okhttp:okhttp:2.2.0'
+    implementation 'com.google.protobuf:protobuf-java:2.5.0'
+    implementation 'com.googlecode.libphonenumber:libphonenumber:7.1.0'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.5.0'
+    implementation 'org.apache.httpcomponents:httpclient:4.4'
+    implementation 'com.squareup.okhttp3:okhttp:3.12.10'
 
-    compile 'com.github.ForstaLabs:libsignal-protocol-java:forsta-v2.2.0.6'
+    implementation 'com.github.ForstaLabs:libsignal-protocol-java:forsta-v2.2.0.6'
 
-    testCompile 'junit:junit:3.8.2'
+    testImplementation 'junit:junit:3.8.2'
 }
 
 tasks.whenTaskAdded { task ->
