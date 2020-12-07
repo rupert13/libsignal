@@ -137,5 +137,6 @@ public class OkHttpClientWrapper extends WebSocketListener {
     public void onOpen(WebSocket webSocket, Response response) {
         super.onOpen(webSocket, response);
         connected = true;
+        listener.onConnected();
     }
 }
