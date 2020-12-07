@@ -399,7 +399,7 @@ public class PushServiceSocket {
       OkHttpClient.Builder okHttpClientBuilder = new OkHttpClient.Builder();
       OkHttpClient okHttpClient;
       okHttpClientBuilder
-//              .certificatePinner(certPinner)
+              .certificatePinner(certPinner)
               .hostnameVerifier(new StrictHostnameVerifier());
       SSLContext context;
       try {
@@ -464,7 +464,7 @@ public class PushServiceSocket {
       OkHttpClient.Builder okHttpClientBuilder = new OkHttpClient.Builder();
       OkHttpClient okHttpClient;
       okHttpClientBuilder
-//              .certificatePinner(certPinner)
+              .certificatePinner(certPinner)
               .hostnameVerifier(new StrictHostnameVerifier());
       SSLContext context;
       try {
@@ -697,7 +697,7 @@ public class PushServiceSocket {
                 .build();
 
       OkHttpClient okHttpClient = new OkHttpClient.Builder()
-//              .certificatePinner(certPinner)
+              .certificatePinner(certPinner)
               .hostnameVerifier(new StrictHostnameVerifier())
               .sslSocketFactory(context.getSocketFactory())
               .build();
