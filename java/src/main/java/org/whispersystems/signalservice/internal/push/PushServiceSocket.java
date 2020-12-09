@@ -44,6 +44,7 @@ import org.whispersystems.signalservice.internal.util.JsonUtil;
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.TrustManager;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
@@ -395,27 +396,29 @@ public class PushServiceSocket {
     setRequestAuthorisation(connection);
 
     try {
-      if (connection.getResponseCode() != 200) {
-        throw new NonSuccessfulResponseCodeException("Bad response: " + connection.getResponseCode());
-      }
-
-      OutputStream output        = new FileOutputStream(localDestination);
-      InputStream  input         = connection.getInputStream();
-      byte[]       buffer        = new byte[4096];
-      int          contentLength = connection.getContentLength();
-      int         read,totalRead = 0;
-
-      while ((read = input.read(buffer)) != -1) {
-        output.write(buffer, 0, read);
-        totalRead += read;
-
-        if (listener != null) {
-          listener.onAttachmentProgress(contentLength, totalRead);
+        if (connection.getResponseCode() != 200) {
+            throw new NonSuccessfulResponseCodeException("Bad response: " + connection.getResponseCode());
         }
-      }
 
-      output.close();
-      Log.w(TAG, "Downloaded: " + url + " to: " + localDestination.getAbsolutePath());
+        OutputStream output = new FileOutputStream(localDestination);
+        InputStream input = connection.getInputStream();
+        byte[] buffer = new byte[4096];
+        int contentLength = connection.getContentLength();
+        int read, totalRead = 0;
+
+        while ((read = input.read(buffer)) != -1) {
+            output.write(buffer, 0, read);
+            totalRead += read;
+
+            if (listener != null) {
+                listener.onAttachmentProgress(contentLength, totalRead);
+            }
+        }
+
+        output.close();
+        Log.w(TAG, "Downloaded: " + url + " to: " + localDestination.getAbsolutePath());
+    } catch (SSLHandshakeException e) {
+        throw e;
     } catch (IOException ioe) {
       throw new PushNetworkException(ioe);
     } finally {
@@ -566,8 +569,7 @@ public class PushServiceSocket {
   }
 
   private String makeRequest(String urlFragment, String method, String body)
-      throws NonSuccessfulResponseCodeException, PushNetworkException
-  {
+          throws NonSuccessfulResponseCodeException, PushNetworkException, SSLHandshakeException {
     Response response = getConnection(urlFragment, method, body);
 
     int    responseCode;
@@ -578,6 +580,8 @@ public class PushServiceSocket {
       responseCode    = response.code();
       responseMessage = response.message();
       responseBody    = response.body().string();
+    } catch (SSLHandshakeException e) {
+        throw e;
     } catch (IOException ioe) {
       throw new PushNetworkException(ioe);
     }
@@ -598,6 +602,8 @@ public class PushServiceSocket {
         } catch (JsonProcessingException e) {
           Log.w(TAG, e);
           throw new NonSuccessfulResponseCodeException("Bad response: " + responseCode + " " + responseMessage);
+        } catch (SSLHandshakeException e) {
+            throw e;
         } catch (IOException e) {
           throw new PushNetworkException(e);
         }
@@ -610,6 +616,8 @@ public class PushServiceSocket {
           staleDevices = JsonUtil.fromJson(responseBody, StaleDevices.class);
         } catch (JsonProcessingException e) {
           throw new NonSuccessfulResponseCodeException("Bad response: " + responseCode + " " + responseMessage);
+        } catch (SSLHandshakeException e) {
+            throw e;
         } catch (IOException e) {
           throw new PushNetworkException(e);
         }
@@ -622,6 +630,8 @@ public class PushServiceSocket {
           deviceLimit = JsonUtil.fromJson(responseBody, DeviceLimit.class);
         } catch (JsonProcessingException e) {
           throw new NonSuccessfulResponseCodeException("Bad response: " + responseCode + " " + responseMessage);
+        } catch (SSLHandshakeException e) {
+            throw e;
         } catch (IOException e) {
           throw new PushNetworkException(e);
         }
@@ -640,8 +650,7 @@ public class PushServiceSocket {
   }
 
   private Response getConnection(String urlFragment, String method, String body)
-      throws PushNetworkException
-  {
+          throws PushNetworkException, SSLHandshakeException {
     try {
       Log.w(TAG, "Push service URL: " + serviceUrl);
       Log.w(TAG, "Opening URL: " + String.format("%s%s", serviceUrl, urlFragment));
@@ -671,6 +680,8 @@ public class PushServiceSocket {
       }
 
       return okHttpClient.newCall(request.build()).execute();
+    } catch (SSLHandshakeException e) {
+        throw e;
     } catch (IOException e) {
       throw new PushNetworkException(e);
     } catch (NoSuchAlgorithmException | KeyManagementException e) {
