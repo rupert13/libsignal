@@ -1,5 +1,11 @@
 package org.whispersystems.signalservice.internal.websocket;
 
+import com.squareup.okhttp.OkHttpClient;
+import com.squareup.okhttp.Request;
+import com.squareup.okhttp.Response;
+import com.squareup.okhttp.internal.ws.WebSocket;
+import com.squareup.okhttp.internal.ws.WebSocketListener;
+
 import org.whispersystems.libsignal.logging.Log;
 import org.whispersystems.signalservice.api.push.TrustStore;
 import org.whispersystems.signalservice.api.util.CredentialsProvider;
@@ -14,17 +20,10 @@ import java.util.concurrent.TimeUnit;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
 
-import okhttp3.CertificatePinner;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-import okhttp3.WebSocket;
-import okhttp3.WebSocketListener;
 import okio.Buffer;
 import okio.BufferedSource;
-import okio.ByteString;
 
-public class OkHttpClientWrapper extends WebSocketListener {
+public class OkHttpClientWrapper implements WebSocketListener {
 
   private static final String TAG = OkHttpClientWrapper.class.getSimpleName();
 
@@ -59,6 +58,24 @@ public class OkHttpClientWrapper extends WebSocketListener {
         int attempt = 0;
 
         while ((webSocket = newSocket(timeout, timeUnit)) != null) {
+          try {
+            Response response = webSocket.connect(OkHttpClientWrapper.this);
+
+            if (response.code() == 101) {
+              synchronized (OkHttpClientWrapper.this) {
+                if (closed) webSocket.close(1000, "OK");
+                else        connected = true;
+              }
+
+              listener.onConnected();
+              return;
+            }
+
+            Log.w(TAG, "WebSocket Response: " + response.code());
+          } catch (IOException e) {
+            Log.w(TAG, e);
+          }
+
           Util.sleep(Math.min(++attempt * 200, TimeUnit.SECONDS.toMillis(15)));
         }
       }
@@ -67,47 +84,51 @@ public class OkHttpClientWrapper extends WebSocketListener {
 
   public synchronized void disconnect() {
     Log.w(TAG, "Calling disconnect()...");
+    try {
       closed = true;
       if (webSocket != null && connected) {
         webSocket.close(1000, "OK");
       }
+    } catch (IOException e) {
+      Log.w(TAG, e);
+    }
   }
 
-  public void sendMessage(byte[] message) {
-    webSocket.send(ByteString.of(message));
+  public void sendMessage(byte[] message) throws IOException {
+    webSocket.sendMessage(WebSocket.PayloadType.BINARY, new Buffer().write(message));
   }
 
   @Override
-  public synchronized void onMessage(WebSocket webSocket, ByteString payload) {
-    listener.onMessage(payload.toByteArray());
+  public void onMessage(BufferedSource payload, WebSocket.PayloadType type) throws IOException {
+    Log.w(TAG, "onMessage: " + type);
+    if (type.equals(WebSocket.PayloadType.BINARY)) {
+      listener.onMessage(payload.readByteArray());
+    }
+
+    payload.close();
   }
 
   @Override
-  public synchronized void onClosed(WebSocket webSocket, int code, String reason) {
+  public void onClose(int code, String reason) {
     Log.w(TAG, String.format("onClose(%d, %s)", code, reason));
     listener.onClose();
   }
 
   @Override
-  public void onFailure(WebSocket webSocket, Throwable t, Response r) {
-      Log.w(TAG, t);
-      listener.onClose();
+  public void onFailure(IOException e) {
+    Log.w(TAG, e);
+    listener.onClose();
   }
 
   private synchronized WebSocket newSocket(int timeout, TimeUnit unit) {
     if (closed) return null;
 
     String       filledUri    = String.format(uri, credentialsProvider.getUser(), credentialsProvider.getPassword());
-      CertificatePinner certPinner = new CertificatePinner.Builder()
-              .add("*.kalimdor.network",
-                      "sha256/VtOB0C/9LihdefUvKEOHAB7f+IZgTvW+wfN9AzZ4tVg=")
-              .build();
-    OkHttpClient okHttpClient = new OkHttpClient.Builder()
-            .certificatePinner(certPinner)
-            .sslSocketFactory(createTlsSocketFactory(trustStore))
-            .readTimeout(timeout, unit)
-            .connectTimeout(timeout, unit)
-            .build();
+    OkHttpClient okHttpClient = new OkHttpClient();
+
+    okHttpClient.setSslSocketFactory(createTlsSocketFactory(trustStore));
+    okHttpClient.setReadTimeout(timeout, unit);
+    okHttpClient.setConnectTimeout(timeout, unit);
 
     Request.Builder requestBuilder = new Request.Builder().url(filledUri);
 
@@ -115,7 +136,7 @@ public class OkHttpClientWrapper extends WebSocketListener {
       requestBuilder.addHeader("X-Signal-Agent", userAgent);
     }
 
-    return okHttpClient.newWebSocket(requestBuilder.build(), this);
+    return WebSocket.newWebSocket(okHttpClient, requestBuilder.build());
   }
 
   private SSLSocketFactory createTlsSocketFactory(TrustStore trustStore) {
@@ -133,10 +154,4 @@ public class OkHttpClientWrapper extends WebSocketListener {
     }
   }
 
-    @Override
-    public void onOpen(WebSocket webSocket, Response response) {
-        super.onOpen(webSocket, response);
-        connected = true;
-        listener.onConnected();
-    }
 }
